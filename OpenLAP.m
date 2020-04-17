@@ -1122,14 +1122,4 @@ function [] = export_report(veh,tr,sim,freq,logid)
     % HUD
     disp('Exported .csv file successfully.')
     fprintf(logid,'%s\n','Exported .csv file successfully.') ;
-    % exporting .ld file
-    try
-        path_to_gen = fileparts(which('ld_generator.py')) ;
-        if count(py.sys.path,path_to_gen)==0
-            insert(py.sys.path,int32(0),path_to_gen) ;
-        end
-        py.ld_generator.write_ld_file(filename)
-    catch
-        disp('No .ld file generated.')
-    end
 end
