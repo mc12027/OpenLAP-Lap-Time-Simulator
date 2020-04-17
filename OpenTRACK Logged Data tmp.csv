@@ -1,0 +1,13 @@
+Format,OpenTRACK,,,,,,
+Name,Type Here,,,,,,
+Country,Type Here,,,,,,
+City,Type Here,,,,,,
+Type,Type Here,,,,,,
+Config,Type Here,"Closes track map if needed. Value: ""Closed"" or ""Open""",,,,,
+Direction,Type Here,"Flips data direction. Value: ""Forward"" or ""Backward""",,,,,
+Mirror,Type Here,"Flips lateral acceleration. Value: ""On"" or ""Off""",,,,,
+Export Frequency,Type Here,Hz,,,,,
+,,,,,,,
+Distance,Speed,Yaw Velocity,Lateral Acceleration,Elevation,Banking,Grip Factor,Sector
+m,km/h,deg/s,G,m,deg,,
+Paste data under this line,,,,,,,
