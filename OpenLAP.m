@@ -322,16 +322,16 @@ function [sim] = simulate(veh,tr,simname,logid)
     fprintf(logid,'|_Apex__|_Point_|_Mode__|___x___|___v___|_vmax_|\n') ;
     
     % running simulation
-    for k=uint8(1:2) % mode number
-        switch k
-            case 1 % acceleration
-                mode = 1 ;
-                k_rest = 2 ;
-            case 2 % deceleration
-                mode = -1 ;
-                k_rest = 1 ;
-        end
-        for i=1:N % apex number
+    for i=1:N % apex number
+        for k=uint8(1:2) % mode number
+            switch k
+                case 1 % acceleration
+                    mode = 1 ;
+                    k_rest = 2 ;
+                case 2 % deceleration
+                    mode = -1 ;
+                    k_rest = 1 ;
+            end
             if ~(strcmp(tr.info.config,'Open') && mode==-1 && i==1) % does not run in decel mode at standing start in open track
                 % getting other apex for later checking
                 [i_rest] = other_points(i,N) ;
