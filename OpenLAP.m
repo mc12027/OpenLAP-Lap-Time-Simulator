@@ -515,7 +515,7 @@ function [sim] = simulate(veh,tr,simname,logid)
     engine_power = TPS.*interp1(veh.vehicle_speed,veh.engine_power,V,'linear','extrap') ;
     engine_speed = interp1(veh.vehicle_speed,veh.engine_speed,V,'linear','extrap') ;
     gear = interp1(veh.vehicle_speed,veh.gear,V,'nearest','extrap') ;
-    fuel_cons = cumsum(wheel_torque/veh.tyre_radius.*tr.dx/veh.n_thermal/veh.fuel_LHV) ;
+    fuel_cons = cumsum(wheel_torque/veh.tyre_radius.*tr.dx/veh.n_primary/veh.n_gearbox/veh.n_final/veh.n_thermal/veh.fuel_LHV) ;
     fuel_cons_total = fuel_cons(end) ;
     % HUD
     disp('Engine metrics calculated.')
