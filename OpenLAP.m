@@ -488,14 +488,9 @@ function [sim] = simulate(veh,tr,simname,logid)
     yaw_rate = V.*tr.r ;
     delta = zeros(tr.n,1) ;
     beta = zeros(tr.n,1) ;
-    CF = veh.CF ;
-    CR = veh.CR ;
-    a = (1-veh.df)*veh.L ;
-    b = -veh.df*veh.L ;
-    C = 2*[CF,CF+CR;CF*a,CF*a+CR*b] ;
     for i=1:tr.n
         B = [M*V(i)^2*tr.r(i)+M*g*sind(tr.bank(i));0] ;
-        sol = C\B ;
+        sol = veh.C\B ;
         delta(i) = sol(1)+atand(veh.L*tr.r(i)) ;
         beta(i) = sol(2) ;
     end
