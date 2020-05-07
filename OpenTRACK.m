@@ -48,7 +48,7 @@
 %
 % April 2020.
 
-%% Clearing Memory
+%% Clearing memory
 
 clear
 clc
@@ -56,16 +56,16 @@ close all force
 diary('off')
 fclose('all') ;
 
-%% Track excel file selection
+%% Track file selection
 
 filename = 'Paul Ricard data.csv' ;
 
-%% Mode
+%% Mode selection
 
 mode = 'logged data' ;
-% log_mode = 'speed & yaw' ;
-log_mode = 'speed & latacc' ;
 % mode = 'shape data' ;
+log_mode = 'speed & yaw' ;
+% log_mode = 'speed & latacc' ;
 
 %% Settings
 
@@ -74,16 +74,16 @@ mesh_size = 1 ; % [m]
 % filtering for logged data mode
 filter_dt = 0.5 ; % [s]
 % track map rotation angle
-rotation = 90+45 ; % [deg]
+rotation = 0 ; % [deg]
 % track map shape adjuster
 lambda = 1 ; % [-]
-
-%% HUD
-
-disp(['Reading track file: ',filename])
+% long corner adjuster
+kappa = 1000 ; % [deg]
 
 %% Reading file
-    
+
+% HUD
+disp(['Reading track file: ',filename])
 if strcmp(mode,'logged data')
     
     %% from logged data
@@ -196,7 +196,7 @@ else
     
 end
 
-%% Track name
+%% Track model name
 
 [folder_status,folder_msg] = mkdir('OpenTRACK Tracks') ;
 trackname = "OpenTRACK Tracks/OpenTRACK_"+info.name+"_"+info.config+"_"+info.direction ;
@@ -232,9 +232,9 @@ disp("Time:          "+datestr(now,'HH:MM:SS'))
 disp('==================================================================')
 disp('Track generation started.')
 
-if strcmp(mode,'logged data')
-    %% coarse mesh data
-    
+%% Pre-processing
+
+if strcmp(mode,'logged data') % logged data
     % getting unique points
     [x,rows_to_keep,~] = unique(x) ;
     v = smooth(v(rows_to_keep),round(freq*filter_dt)) ;
@@ -244,6 +244,8 @@ if strcmp(mode,'logged data')
     bk = smooth(bk(rows_to_keep),round(freq*filter_dt)) ;
     gf = smooth(gf(rows_to_keep),round(freq*filter_dt)) ;
     sc = sc(rows_to_keep) ;
+    % shifting position vector for 0 value at start
+    x = x-x(1) ;
     % curvature
     switch log_mode
         case 'speed & yaw'
@@ -256,82 +258,77 @@ if strcmp(mode,'logged data')
     if strcmp(info.mirror,'On')
         r = -r ;
     end
-    % old position vector
-    xx = x ;
     % track length
     L = x(end) ;
-    
-    %% Fine mesh data
-    
-    % new fine position vector
-    if floor(L)<L % check for injecting last point
-        x = [(0:mesh_size:floor(L))';L] ;
-    else
-        x = (0:mesh_size:floor(L))' ;
-    end
-    % distance step vector
-    dx = diff(x) ;
-    dx = [dx;dx(end)] ;
-    % number of mesh points
-    n = length(x) ;
-    % fine curvature vector
-    r = interp1(xx,r,x,'pchip') ;
-    % elevation
-    Z = interp1(xx,el,x,'linear') ;
-    % banking
-    bank = interp1(xx,bk,x,'linear') ;
-    % sector
-    sector = interp1(xx,sc,x,'previous') ;
-    % grip factor
-    factor_grip = interp1(xx,gf,x,'linear') ;
-    % inclination
-    incl = -atand((diff(Z)./diff(x))) ;
-    incl = [incl;incl(end)] ;
-    incl = smooth(incl,round(freq*filter_dt)) ;
-    
-else
-    %% Pre-processing data
-    
+    % saving coarse position vectors
+    xx = x ;
+    xe = x ;
+    xb = x ;
+    xg = x ;
+    xs = x ;
+else % shape data
     % turning radius
     R = table2array(table_shape(:,3)) ;
-    R(R==0) = inf ; % correcting straight segment radius
     % segment length
     l = table2array(table_shape(:,2)) ;
-    % total length
-    L = sum(l) ;
     % segment type
     type_tmp = table2array(table_shape(:,1)) ;
-    % memory preallocation
-    N = length(l) ;
-    type = zeros(N,1) ;
+    % correcting straight segment radius
+    R(R==0) = inf ;
+    % total length
+    L = sum(l) ;
+    % segment type variable conversion to number
+    type = zeros(length(l),1) ;
     type(string(type_tmp)=="Straight") = 0 ;
     type(string(type_tmp)=="Left") = 1 ;
     type(string(type_tmp)=="Right") = -1 ;
     if strcmp(info.mirror,'On')
         type = -type ;
     end
-    % getting data from tables and ignoring points with x>L
-    el = table2array(table_el) ;
-    el(el(:,1)>L,:) = [] ;
-    bk = table2array(table_bk) ;
-    bk(bk(:,1)>L,:) = [] ;
-    gf = table2array(table_gf) ;
-    gf(gf(:,1)>L,:) = [] ;
-    sc = table2array(table_sc) ;
-    sc(sc(:,1)>=L,:) = [] ;
-    sc = [sc;[L,sc(end,end)]] ;
-    % HUD
-    disp('Pre-processing completed.')
-    
-    %% Coarse track meshing
-    
-    % position vectors
+    % injecting points at long corners
+    angle_seg = rad2deg(l./R) ;
+    j = 1 ; % index
+    RR = R ; % new vector containing injected points
+    ll = l ; % new vector containing injected points
+    tt = type ; % new vector containing injected points
+    for i=1:length(l)
+        if angle_seg(i)>kappa
+            l_inj = min([ll(j)/3,deg2rad(kappa)*R(i)]) ;
+            ll = [...
+                ll(1:j-1);...
+                l_inj;...
+                ll(j)-2*l_inj;...
+                l_inj;...
+                ll(j+1:end)...
+                ] ;
+            RR = [...
+                RR(1:j-1);...
+                RR(j);...
+                RR(j);...
+                RR(j);...
+                RR(j+1:end)...
+                ] ;
+            tt = [...
+                tt(1:j-1);...
+                tt(j);...
+                tt(j);...
+                tt(j);...
+                tt(j+1:end)...
+                ] ;
+            j = j+3 ;
+        else
+            j = j+1 ;
+        end
+    end
+    R = RR ;
+    l = ll ;
+    type = tt ;
+    % final segment point calculation
     X = cumsum(l) ; % end position of each segment
     XC = cumsum(l)-l/2 ; % center position of each segment
     j = 1 ; % index
     x = zeros(length(X)+sum(R==inf),1) ; % preallocation
     r = zeros(length(X)+sum(R==inf),1) ; % preallocation
-    % editing points
     for i=1:length(X)
         if R(i)==inf % end of straight point injection
             x(j) = X(i)-l(i) ;
@@ -343,46 +340,61 @@ else
             j = j+1 ;
         end
     end
-    % saving coarse results
-    rr = r ;
+    % getting data from tables and ignoring points with x>L
+    el = table2array(table_el) ;
+    el(el(:,1)>L,:) = [] ;
+    bk = table2array(table_bk) ;
+    bk(bk(:,1)>L,:) = [] ;
+    gf = table2array(table_gf) ;
+    gf(gf(:,1)>L,:) = [] ;
+    sc = table2array(table_sc) ;
+    sc(sc(:,1)>=L,:) = [] ;
+    sc = [sc;[L,sc(end,end)]] ;
+    % saving coarse position vectors
     xx = x ;
-    % HUD
-    disp('Coarse meshing completed.')
-    
-    %% Fine track meshing
-    
-    % new fine position vector
-    if floor(L)<L % check for injecting last point
-        x = [(0:mesh_size:floor(L))';L] ;
-    else
-        x = (0:mesh_size:floor(L))' ;
-    end
-    % distance step vector
-    dx = diff(x) ;
-    dx = [dx;dx(end)] ;
-    % number of mesh points
-    n = length(x) ;
-    % fine curvature vector
-    r = interp1(xx,rr,x,'pchip') ;
-    % fine turn direction vector
-    t = sign(r) ;
-    % elevation
-    Z = interp1(el(:,1),el(:,2),x,'pchip','extrap') ;
-    % banking
-    bank = interp1(bk(:,1),bk(:,2),x,'pchip','extrap') ;
-    % inclination
-    incl = -atand((diff(Z)./diff(x))) ;
-    incl = [incl;incl(end)] ;
-    % grip factors
-    factor_grip = interp1(gf(:,1),gf(:,2),x,'linear','extrap') ;
-    % sectors
-    sector = interp1(sc(:,1),sc(:,2),x,'previous') ;
-    % HUD
-    disp("Fine meshing completed with mesh size: "+num2str(mesh_size)+" [m]")
-    
+    xe = el(:,1) ;
+    xb = bk(:,1) ;
+    xg = gf(:,1) ;
+    xs = sc(:,1) ;
+    % saving coarse topology
+    el = el(:,2) ;
+    bk = bk(:,2) ;
+    gf = gf(:,2) ;
+    sc = sc(:,2) ;
 end
+% HUD
+disp('Pre-processing completed.')
 
-%% Map
+%% Meshing
+
+% new fine position vector
+if floor(L)<L % check for injecting last point
+    x = [(0:mesh_size:floor(L))';L] ;
+else
+    x = (0:mesh_size:floor(L))' ;
+end
+% distance step vector
+dx = diff(x) ;
+dx = [dx;dx(end)] ;
+% number of mesh points
+n = length(x) ;
+% fine curvature vector
+r = interp1(xx,r,x,'pchip','extrap') ;
+% elevation
+Z = interp1(xe,el,x,'linear','extrap') ;
+% banking
+bank = interp1(xb,bk,x,'linear','extrap') ;
+% inclination
+incl = -atand((diff(Z)./diff(x))) ;
+incl = [incl;incl(end)] ;
+% grip factor
+factor_grip = interp1(xg,gf,x,'linear','extrap') ;
+% sector
+sector = interp1(xs,sc,x,'previous','extrap') ;
+% HUD
+disp("Fine meshing completed with mesh size: "+num2str(mesh_size)+" [m]")
+
+%% Map generation
 
 % coordinate vector preallocation
 X = zeros(n,1) ;
@@ -392,13 +404,17 @@ angle_seg = lambda*rad2deg(dx.*r) ;
 % heading angles
 angle_head = cumsum(angle_seg) ;
 if strcmp(info.config,'Closed') % tangency correction for closed track
-    dh = [mod(angle_head(end),sign(angle_head(end))*360);angle_head(end)-sign(angle_head(end))*360] ;
+    dh = [...
+        mod(angle_head(end),sign(angle_head(end))*360);...
+        angle_head(end)-sign(angle_head(end))*360....
+        ] ;
     [~,idx] = min(abs(dh)) ;
     dh = dh(idx) ;
     angle_head = angle_head-x/L*dh ;
     angle_seg = [angle_head(1);diff(angle_head)] ;
 end
-% map points calculation ignoring elevation
+angle_head = angle_head-angle_head(1) ;
+% map generation
 for i=2:n
     % previous point
     p = [X(i-1);Y(i-1);0] ;
@@ -409,7 +425,7 @@ for i=2:n
     Y(i) = xyz(2) ;
 end
 
-%% Finding apexes
+%% Apexes
 
 % finding Apexes
 [~,apex] = findpeaks(abs(r)) ;
@@ -444,8 +460,6 @@ Z = xyz(3,:)' ;
 % HUD
 disp('Track rotated.')
 
-% distance step vector
-dx = diff(x) ;
 % closing map if necessary
 if strcmp(info.config,'Closed') % closed track
     % HUD
@@ -463,21 +477,17 @@ if strcmp(info.config,'Closed') % closed track
     % recalculating inclination
     incl = -atand((diff(Z)./diff(x))) ;
     incl = [incl;(incl(end-1)+incl(1))/2] ;
-    % final point injection in distance vector
-    dx = [(dx(1)+dx(end))/2;dx] ;
     % HUD
     disp('Fine mesh map closed.')
-else % open track
-    % final point injection in distance vector
-    dx = [dx;dx(end)] ;
 end
 % smoothing track inclination
 incl = smooth(incl) ;
 % HUD
 disp('Fine mesh map created.')
 
-%% Finish line arrow
+%% Plotting Results
 
+% finish line arrow
 % settings
 factor_scale = 25 ;
 half_angle = 40 ;
@@ -497,8 +507,6 @@ arrow_y = [arrow_1(2);arrow_c(2);arrow_2(2)] ;
 arrow_z = [arrow_1(3);arrow_c(3);arrow_2(3)] ;
 % final arrow matrix
 arrow = [arrow_x,arrow_y,arrow_z] ;
-
-%% Ploting Results
 
 % figure
 set(0,'units','pixels') ;
@@ -746,7 +754,7 @@ function [header,data] = read_logged_data(filename,header_startRow,header_endRow
     end
     % Create output variable
     data = [dataArray{1:end-1}];
-
+    
     % Close the text file.
     fclose(fileID);
 end
