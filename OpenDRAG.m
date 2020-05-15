@@ -58,7 +58,7 @@ dt = 1E-3 ;
 % maximum simulation time for memory preallocation
 t_max = 60 ;
 % acceleration sensitivity for drag limitation
-ax_sens = 0.01 ; % [m/s2]
+ax_sens = 0.05 ; % [m/s2]
 % speed traps
 speed_trap = [50;100;150;200;250;300;350]/3.6 ;
 % track data
@@ -106,6 +106,7 @@ N = t_max/dt ;
 T = -ones(N,1) ;
 X = -ones(N,1) ;
 V = -ones(N,1) ;
+A = -ones(N,1) ;
 RPM = -ones(N,1) ;
 TPS = -ones(N,1) ;
 BPS = -ones(N,1) ;
@@ -119,6 +120,8 @@ x = 0 ;
 x_start = 0 ;
 % initial velocity
 v = 0 ;
+% initial accelerartion
+a = 0 ;
 % initial gears
 gear = 1 ;
 gear_prev = 1 ;
@@ -152,22 +155,22 @@ delete(simname+".log") ;
 diary(simname+".log") ;
 % HUD
 disp([...
-    '           _______                    ________________________________';...
-    '           __  __ \______________________  __ \__  __ \__    |_  ____/';...
-    '           _  / / /__  __ \  _ \_  __ \_  / / /_  /_/ /_  /| |  / __  ';...
-    '           / /_/ /__  /_/ /  __/  / / /  /_/ /_  _, _/_  ___ / /_/ /  ';...
-    '           \____/ _  .___/\___//_/ /_//_____/ /_/ |_| /_/  |_\____/   ';...
-    '                  /_/                                                 '...
+    '               _______                    ________________________________';...
+    '               __  __ \______________________  __ \__  __ \__    |_  ____/';...
+    '               _  / / /__  __ \  _ \_  __ \_  / / /_  /_/ /_  /| |  / __  ';...
+    '               / /_/ /__  /_/ /  __/  / / /  /_/ /_  _, _/_  ___ / /_/ /  ';...
+    '               \____/ _  .___/\___//_/ /_//_____/ /_/ |_| /_/  |_\____/   ';...
+    '                      /_/                                                 '...
     ]) ;
-disp('===============================================================================')
+disp('=======================================================================================')
 disp(['Vehicle: ',char(veh.name)])
 disp("Date:    "+datestr(now,'dd/mm/yyyy'))
 disp("Time:    "+datestr(now,'HH:MM:SS'))
-disp('===============================================================================')
+disp('=======================================================================================')
 disp('Acceleration simulation started:')
 disp(['Initial Speed: ',num2str(v*3.6),' km/h'])
-disp('|_______Comment________|_Speed_|_EnRPM_|_Gear__|_Tabs__|_Xabs__|_Trel__|_Xrel_|')
-disp('|______________________|[km/h]_|_[rpm]_|__[#]__|__[s]__|__[m]__|__[s]__|_[m]__|')
+disp('|_______Comment________|_Speed_|_Accel_|_EnRPM_|_Gear__|_Tabs__|_Xabs__|_Trel__|_Xrel_|')
+disp('|______________________|[km/h]_|__[G]__|_[rpm]_|__[#]__|__[s]__|__[m]__|__[s]__|_[m]__|')
 
 %% Acceleration
 
@@ -179,16 +182,35 @@ while true
     T(i) = t ;
     X(i) = x ;
     V(i) = v ;
+    A(i) = a ;
     RPM(i) = rpm ;
     TPS(i) = tps ;
     BPS(i) = 0 ;
     GEAR(i) = gear ;
+    % checking if rpm limiter is on or if out of memory
+    if v>=veh.v_max
+        % HUD
+        fprintf('Engine speed limited\t')
+        hud(v,a,rpm,gear,t,x,t_start,x_start)
+        break
+    elseif i==N
+        % HUD
+        disp(['Did not reach maximum speed at time ',num2str(t),' s'])
+        break
+    end
+    % check if drag limited
+    if tps==1 && ax+ax_drag<=ax_sens
+        % HUD
+        fprintf('Drag limited        \t')
+        hud(v,a,rpm,gear,t,x,t_start,x_start)
+        break
+    end
     % checking speed trap
     if check_speed_traps
         % checking if current speed is above trap speed
         if v>=speed_trap(trap_number)
             fprintf('%s%3d %3d%s ','Speed Trap #',trap_number,round(speed_trap(trap_number)*3.6),'km/h')
-            hud(v,rpm,gear,t,x,t_start,x_start)
+            hud(v,a,rpm,gear,t,x,t_start,x_start)
             % next speed trap
             trap_number = trap_number+1 ;
             % checking if speed traps are completed
@@ -196,17 +218,6 @@ while true
                 check_speed_traps = false ;
             end
         end
-    end
-    % checking if rpm limiter is on or if out of memory
-    if v>=veh.v_max
-        % HUD
-        fprintf('Engine speed limited\t')
-        hud(v,rpm,gear,t,x,t_start,x_start)
-        break
-    elseif i==N
-        % HUD
-        disp(['Did not reach maximum speed at time ',num2str(t),' s'])
-        break
     end
     % aero forces
     Aero_Df = 1/2*veh.rho*veh.factor_Cl*veh.Cl*veh.A*v^2 ;
@@ -230,7 +241,7 @@ while true
         if gear==veh.nog % maximum gear number
             % HUD
             fprintf('Engine speed limited\t')
-            hud(v,rpm,gear,t,x,t_start,x_start)
+            hud(v,a,rpm,gear,t,x,t_start,x_start)
             break
         else % higher gear available
             % shifting condition
@@ -251,7 +262,7 @@ while true
         if t-t_shift>veh.shift_time
             % HUD
             fprintf('%s%2d\t','Shifting to gear #',gear_prev+1)
-            hud(v,rpm,gear_prev+1,t,x,t_start,x_start)
+            hud(v,a,rpm,gear_prev+1,t,x,t_start,x_start)
             % shifting condition
             shifting = false ;
             % next gear
@@ -271,13 +282,6 @@ while true
     tps = ax/ax_power_limit ;
     % longitudinal acceleration
     a = ax+ax_drag ;
-    % check if drag limited
-    if tps==1 && ax+ax_drag<=ax_sens
-        % HUD
-        fprintf('Drag limited        \t')
-        hud(v,rpm,gear,t,x,t_start,x_start)
-        break
-    end
     % new position
     x = x+v*dt+1/2*a*dt^2 ;
     % new velocity
@@ -287,6 +291,12 @@ while true
     % next iteration
     i = i+1 ;
 end
+i_acc = i ; % saving acceleration index
+% average acceleration
+a_acc_ave = v/t ;
+disp(['Average acceleration:    ',num2str(a_acc_ave/9.81,'%6.3f'),' [G]'])
+disp(['Peak acceleration   :    ',num2str(max(A)/9.81,'%6.3f'),' [G]'])
+% acceleration timer
 toc(acceleration_timer)
 
 %% Deceleration preprocessing
@@ -307,8 +317,8 @@ trap_number = length(speed_trap_decel) ;
 disp('===============================================================================')
 disp('Deceleration simulation started:')
 disp(['Initial Speed: ',num2str(v*3.6),' [km/h]'])
-disp('|_______Comment________|_Speed_|_EnRPM_|_Gear__|_Tabs__|_Xabs__|_Trel__|_Xrel_|')
-disp('|______________________|[km/h]_|_[rpm]_|__[#]__|__[s]__|__[m]__|__[s]__|_[m]__|')
+disp('|_______Comment________|_Speed_|_Accel_|_EnRPM_|_Gear__|_Tabs__|_Xabs__|_Trel__|_Xrel_|')
+disp('|______________________|[km/h]_|__[G]__|_[rpm]_|__[#]__|__[s]__|__[m]__|__[s]__|_[m]__|')
 
 %% Deceleration
 
@@ -318,17 +328,31 @@ while true
     T(i) = t ;
     X(i) = x ;
     V(i) = v ;
+    A(i) = a ;
     RPM(i) = rpm ;
     TPS(i) = 0 ;
     BPS(i) = bps ;
     GEAR(i) = gear ;
+    % checking if stopped or if out of memory
+    if v<=0
+        % zeroing speed
+        v = 0 ;
+        % HUD
+        fprintf('Stopped             \t')
+        hud(v,a,rpm,gear,t,x,t_start,x_start)
+        break
+    elseif i==N
+        % HUD
+        disp(['Did not stop at time ',num2str(t),' s'])
+        break
+    end
     % checking speed trap
     if check_speed_traps
         % checking if current speed is under trap speed
         if v<=speed_trap_decel(trap_number)
             % HUD
             fprintf('%s%3d %3d%s ','Speed Trap #',trap_number,round(speed_trap(trap_number)*3.6),'km/h')
-            hud(v,rpm,gear,t,x,t_start,x_start)
+            hud(v,a,rpm,gear,t,x,t_start,x_start)
             % next speed trap
             trap_number = trap_number-1 ;
             % checking if speed traps are completed
@@ -336,19 +360,6 @@ while true
                 check_speed_traps = false ;
             end
         end
-    end
-    % checking if stopped or if out of memory
-    if v<=0
-        % zeroing speed
-        v = 0 ;
-        % HUD
-        fprintf('Stopped             \t')
-        hud(v,rpm,gear,t,x,t_start,x_start)
-        break
-    elseif i==N
-        % HUD
-        disp(['Did not stop at time ',num2str(t),' s'])
-        break
     end
     % aero forces
     Aero_Df = 1/2*veh.rho*veh.factor_Cl*veh.Cl*veh.A*v^2 ;
@@ -378,14 +389,17 @@ while true
     % next iteration
     i = i+1 ;
 end
+% average deceleration
+a_dec_ave = V(i_acc)/(t-t_start) ;
+disp(['Average deceleration:    ',num2str(a_dec_ave/9.81,'%6.3f'),' [G]'])
+disp(['Peak deceleration   :    ',num2str(-min(A)/9.81,'%6.3f'),' [G]'])
 % deceleration timer
 toc(deceleration_timer)
 
 %% End of simulation
 
 disp('===============================================================================')
-disp('Simulation completed successfully.')
-% total timer
+disp('Simulation completed successfully.')% total timer
 toc(total_timer)
 
 %% Results compression
@@ -396,6 +410,7 @@ to_delete = T==-1 ;
 T(to_delete) = [] ;
 X(to_delete) = [] ;
 V(to_delete) = [] ;
+A(to_delete) = [] ;
 RPM(to_delete) = [] ;
 TPS(to_delete) = [] ;
 BPS(to_delete) = [] ;
@@ -421,7 +436,7 @@ figtitle = ["OpenDRAG","Vehicle: "+veh.name,"Date & Time: "+datestr(now,'yyyy/mm
 sgtitle(figtitle)
 
 % rows & columns
-row = 6 ;
+row = 7 ;
 col = 2 ;
 % plot number
 i = 0 ;
@@ -454,6 +469,24 @@ title('Speed')
 xlabel('Distance [m]')
 ylabel('Speed [km/h]')
 plot(X,V*3.6)
+
+% acceleration
+i = i+1 ;
+subplot(row,col,i)
+hold on
+grid on
+title('Acceleration')
+xlabel('Time [s]')
+ylabel('Acceleration [m/s2]')
+plot(T,A)
+i = i+1 ;
+subplot(row,col,i)
+hold on
+grid on
+title('Acceleration')
+xlabel('Distance [m]')
+ylabel('Acceleration [m/s2]')
+plot(X,A)
 
 % engine speed
 i = i+1 ;
@@ -532,13 +565,14 @@ savefig(f,simname+".fig")
 %% HUD function
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [] = hud(v,rpm,gear,t,x,t_start,x_start)
+function [] = hud(v,a,rpm,gear,t,x,t_start,x_start)
 %     disp(['          Speed         : ',num2str(v*3.6),' km/h'])
+%     disp(['          Acceleration  : ',num2str(g/9.81),' G'])
 %     disp(['          RPM           : ',num2str(rpm)])
 %     disp(['          Gear          : ',num2str(gear)])
 %     disp(['          Time          : ',num2str(t-t_start),' s'])
 %     disp(['          Distance      : ',num2str(x-x_start),' m'])
 %     disp(['          Total Time    : ',num2str(t),' s'])
 %     disp(['          Total Distance: ',num2str(x),' m'])
-    fprintf('%7.2f\t%7d\t%7d\t%7.2f\t%7.2f\t%7.2f\t%7.2f\n',v*3.6,round(rpm),gear,t,x,t-t_start,x-x_start) ;
+    fprintf('%7.2f\t%7.2f\t%7d\t%7d\t%7.2f\t%7.2f\t%7.2f\t%7.2f\n',v*3.6,a/9.81,round(rpm),gear,t,x,t-t_start,x-x_start) ;
 end
