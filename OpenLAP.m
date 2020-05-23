@@ -197,13 +197,15 @@ grid on
 % ggv circle
 subplot(rows,cols,[11,13])
 hold on
-scatter3(sim.lat_acc.data,sim.long_acc.data,sim.speed.data*3.6,'.')
-legend('Friction Circle','Location','northeast')
+scatter3(sim.lat_acc.data,sim.long_acc.data,sim.speed.data*3.6,50,'ro','filled','MarkerEdgeColor',[0,0,0])
+surf(veh.GGV(:,:,2),veh.GGV(:,:,1),veh.GGV(:,:,3)*3.6,'EdgeAlpha',0.3,'FaceAlpha',0.8)
+legend('OpenLAP','GGV','Location','northeast')
 xlabel('LatAcc [m/s^2]')
 ylabel('LonAcc [m/s^2]')
 zlabel('Speed [km/h]')
 grid on
-axis equal
+set(gca,'DataAspectRatio',[1 1 3])
+axis tight
 
 % track map
 subplot(rows,cols,[12,14])
@@ -304,8 +306,8 @@ function [sim] = simulate(veh,tr,simname,logid)
     v = single(inf*ones(tr.n,N,2)) ;
     ax = single(zeros(tr.n,N,2)) ;
     ay = single(zeros(tr.n,N,2)) ;
-    tps = single(zeros(tr.n,N)) ;
-    bps = single(zeros(tr.n,N)) ;
+    tps = single(zeros(tr.n,N,2)) ;
+    bps = single(zeros(tr.n,N,2)) ;
     
     % HUD
     disp('Starting acceleration and deceleration.')
@@ -340,8 +342,10 @@ function [sim] = simulate(veh,tr,simname,logid)
                 % saving speed & latacc & driver inputs from presolved apex
                 v(j,i,k) = v_apex(i) ;
                 ay(j,i,k) = v_apex(i)^2*tr.r(j) ;
-                tps(j,:) = tps_apex(i)*ones(1,N) ;
-                bps(j,:) = bps_apex(i)*ones(1,N) ;
+                tps(j,:,1) = tps_apex(i)*ones(1,N) ;
+                bps(j,:,1) = bps_apex(i)*ones(1,N) ;
+                tps(j,:,2) = tps_apex(i)*ones(1,N) ;
+                bps(j,:,2) = bps_apex(i)*ones(1,N) ;
                 % setting apex flag
                 flag(j,k) = true ;
                 % getting next point index
@@ -356,7 +360,7 @@ function [sim] = simulate(veh,tr,simname,logid)
                     % writing to log file
                     fprintf(logid,'%7d\t%7d\t%7d\t%7.1f\t%7.2f\t%7.2f\n',i,j,k,tr.x(j),v(j,i,k),v_max(j)) ;
                     % calculating speed, accelerations and driver inputs from vehicle model
-                    [v(j_next,i,k),ax(j,i,k),ay(j,i,k),tps(j,k),bps(j,k),overshoot] = vehicle_model_comb(veh,tr,v(j,i,k),v_max(j_next),j,mode) ;
+                    [v(j_next,i,k),ax(j,i,k),ay(j,i,k),tps(j,i,k),bps(j,i,k),overshoot] = vehicle_model_comb(veh,tr,v(j,i,k),v_max(j_next),j,mode) ;
                     % checking for limit
                     if overshoot
                         break
@@ -426,30 +430,13 @@ function [sim] = simulate(veh,tr,simname,logid)
         if idx<=IDX % solved in acceleration
             AX(i) = ax(i,idx,1) ;
             AY(i) = ay(i,idx,1) ;
-            TPS(i) = tps(i,1) ;
-            BPS(i) = bps(i,1) ;
+            TPS(i) = tps(i,idx,1) ;
+            BPS(i) = bps(i,idx,1) ;
         else % solved in deceleration
             AX(i) = ax(i,idx-IDX,2) ;
             AY(i) = ay(i,idx-IDX,2) ;
-            TPS(i) = tps(i,2) ;
-            BPS(i) = bps(i,2) ;
-        end
-    end
-    % correcting driver inputs at apex
-    for i=1:tr.n
-        if max(i==apex)
-            correct_inputs = true ;
-            [~,i_next] = next_point(i,tr.n,1,tr.info.config) ;
-            [~,i_prev] = next_point(i,tr.n,-1,tr.info.config) ;
-            if strcmp(tr.info.config,'Open')
-                if i==1 || i==tr.n
-                    correct_inputs = false ;
-                end
-            end
-            if correct_inputs
-                TPS(i) = mean([TPS(i_next),TPS(i_prev)]) ;
-                BPS(i) = mean([BPS(i_next),BPS(i_prev)]) ;
-            end
+            TPS(i) = tps(i,idx-IDX,2) ;
+            BPS(i) = bps(i,idx-IDX,2) ;
         end
     end
     % HUD
@@ -686,22 +673,11 @@ function [v,tps,bps] = vehicle_model_lat(veh,tr,p)
     % induced weight from banking and inclination
     Wy = -M*g*sind(bank) ;
     Wx = M*g*sind(incl) ;
-    % Z axis forces
-    fz_mass = -M*g ;
-    fz_aero = 1/2*veh.rho*veh.factor_Cl*veh.Cl*veh.A*veh.vehicle_speed.^2 ;
-    fz_total = fz_mass+fz_aero ;
-    % x axis forces
-    fx_aero = 1/2*veh.rho*veh.factor_Cd*veh.Cd*veh.A*veh.vehicle_speed.^2 ;
-    fx_roll = veh.Cr*abs(fz_total) ;
-    % drag limitation
-    [~,idx] = min(abs(veh.factor_power*veh.fx_engine+fx_aero+fx_roll+Wx)) ;
-    v_drag_thres = +0 ; % [m/s]
-    v_drag = veh.vehicle_speed(idx)+v_drag_thres ; % the v_drag_thres factor is there to clean up the ax, tps and bps spikes on the straights if needed
     
     %% speed solution
     if r==0 % straight (limited by engine speed limit or drag)
         % checking for engine speed limit
-        v = min([veh.v_max,v_drag]) ;
+        v = veh.v_max ;
         tps = 1 ; % full throttle
         bps = 0 ; % 0 brake
     else % corner (may be limited by engine, drag or cornering ability)
@@ -735,7 +711,7 @@ function [v,tps,bps] = vehicle_model_lat(veh,tr,p)
             error(['Discriminant <0 at point index: ',num2str(p)])
         end
         % checking for engine speed limit
-        v = min([v,veh.v_max,v_drag]) ;
+        v = min([v,veh.v_max]) ;
         %% adjusting speed for drag force compensation
         adjust_speed = true ;
         while adjust_speed
@@ -838,7 +814,7 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
     % drag acceleration
     ax_drag = (Aero_Dr+Roll_Dr+Wx)/M ;
     % ovesrhoot acceleration limit
-	ax_track_limit = ax_max-ax_drag ;
+	ax_needed = ax_max-ax_drag ;
     
     %% current lat acc
     
@@ -870,7 +846,7 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
     
     %% calculating driver inputs
     
-    if ax_track_limit>=0 % need tps
+    if ax_needed>=0 % need tps
         % max pure long acc available from driven tyres
         ax_tyre_max = 1/M*(mux+dmx*(Nx-Wd))*Wd*driven_wheels ;
         % max combined long acc available from driven tyres
@@ -878,7 +854,7 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
         % getting power limit from engine
         ax_power_limit = 1/M*(interp1(veh.vehicle_speed,veh.factor_power*veh.fx_engine,v)) ;
         % getting tps value
-        scale = min([ax_tyre,ax_track_limit]/ax_power_limit) ;
+        scale = min([ax_tyre,ax_needed]/ax_power_limit) ;
         tps = max([min([1,scale]),0]) ; % making sure its positive
         bps = 0 ; % setting brake pressure to 0
         % final long acc command
@@ -889,12 +865,12 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
         % max comb long acc available from all tyres
         ax_tyre = ax_tyre_max*ellipse_multi ;
         % tyre braking force
-        fx_tyre = min(-[ax_tyre,ax_track_limit])*M ;
+        fx_tyre = min(-[ax_tyre,ax_needed])*M ;
         % getting brake input
         bps = max([fx_tyre,0])*veh.beta ; % making sure its positive
         tps = 0 ; % seting throttle to 0
         % final long acc command
-        ax_com = -min(-[ax_tyre,ax_track_limit]) ;
+        ax_com = -min(-[ax_tyre,ax_needed]) ;
     end
     
     %% final results
@@ -904,7 +880,7 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
     % next speed value
     v_next = sqrt(v^2+2*mode*ax*tr.dx(j)) ;
     % correcting tps for full throttle when at v_max on straights
-    if tps>0 && v/v_next>=1
+    if tps>0 && v/veh.v_max>=1
         tps = 1 ;
     end
     
