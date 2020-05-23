@@ -880,7 +880,7 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
     % next speed value
     v_next = sqrt(v^2+2*mode*ax*tr.dx(j)) ;
     % correcting tps for full throttle when at v_max on straights
-    if tps>0 && v/veh.v_max>=1
+    if tps>0 && v/veh.v_max>=0.999
         tps = 1 ;
     end
     
