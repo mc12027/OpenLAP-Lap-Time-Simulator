@@ -852,7 +852,7 @@ function [v_next,ax,ay,tps,bps,overshoot] = vehicle_model_comb(veh,tr,v,v_max_ne
         % max combined long acc available from driven tyres
         ax_tyre = ax_tyre_max*ellipse_multi ;
         % getting power limit from engine
-        ax_power_limit = 1/M*(interp1(veh.vehicle_speed,veh.factor_power*veh.fx_engine,v,'linear',0) ;
+        ax_power_limit = 1/M*(interp1(veh.vehicle_speed,veh.factor_power*veh.fx_engine,v,'linear',0)) ;
         % getting tps value
         scale = min([ax_tyre,ax_needed]/ax_power_limit) ;
         tps = max([min([1,scale]),0]) ; % making sure its positive
