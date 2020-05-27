@@ -366,7 +366,7 @@ function [sim] = simulate(veh,tr,simname,logid)
                         break
                     end
                     % checking if point is already solved in other apex iteration
-                    if flag(j,k)
+                    if flag(j,k) || flag(j,k_rest)
                         if max(v(j_next,i,k)>=v(j_next,i_rest,k)) || max(v(j_next,i,k)>v(j_next,i_rest,k_rest))
                             break
                         end
