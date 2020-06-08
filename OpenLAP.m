@@ -337,6 +337,9 @@ function [sim] = simulate(veh,tr,simname,logid)
             if ~(strcmp(tr.info.config,'Open') && mode==-1 && i==1) % does not run in decel mode at standing start in open track
                 % getting other apex for later checking
                 [i_rest] = other_points(i,N) ;
+                if isempty(i_rest)
+                    i_rest = i ;
+                end
                 % getting apex index
                 j = uint32(apex(i)) ;
                 % saving speed & latacc & driver inputs from presolved apex
@@ -1014,7 +1017,7 @@ function [] = export_report(veh,tr,sim,freq,logid)
         % getting size for each channel
         s = size(eval(['sim.',all_names{i},'.data'])) ;
         % checking if channel is a vector
-        if s(1)==tr.n && s(2)==1 % is vector
+        if length(s)==2 && s(1)==tr.n && s(2)==1 % is vector
             S = S+1 ;
         else % is not vector
             I(i) = 0 ;
