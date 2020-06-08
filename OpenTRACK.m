@@ -58,23 +58,30 @@ fclose('all') ;
 
 %% Track file selection
 
-filename = 'Paul Ricard data.csv' ;
+% filename = 'Paul Ricard data.csv' ;
+% filename = 'Spa-Francorchamps.xlsx' ;
+% filename = 'Monza Data.csv' ;
+% filename = 'OpenTRACK Laguna Seca Data.csv' ;
+% filename = 'OpenTRACK Paul Ricard Data.csv' ;
+filename = 'OpenTRACK_FSAE_UK_Endurance_2015.xlsx' ;
+% filename = 'OpenTRACK KZ2 Kart Data - Rhodes.csv' ;
+% filename = 'OpenTRACK KZ2 Kart Data - Athens.csv' ;
 
 %% Mode selection
 
-mode = 'logged data' ;
-% mode = 'shape data' ;
-log_mode = 'speed & yaw' ;
-% log_mode = 'speed & latacc' ;
+% mode = 'logged data' ;
+mode = 'shape data' ;
+% log_mode = 'speed & yaw' ;
+log_mode = 'speed & latacc' ;
 
 %% Settings
 
 % meshing
 mesh_size = 1 ; % [m]
 % filtering for logged data mode
-filter_dt = 0.5 ; % [s]
+filter_dt = 0.1 ; % [s]
 % track map rotation angle
-rotation = 90+45 ; % [deg]
+rotation = 0 ; % [deg]
 % track map shape adjuster
 lambda = 1 ; % [-]
 % long corner adjuster
@@ -242,16 +249,16 @@ if strcmp(mode,'logged data') % logged data
     ay = smooth(ay(rows_to_keep),round(freq*filter_dt)) ;
     el = smooth(el(rows_to_keep),round(freq*filter_dt)) ;
     bk = smooth(bk(rows_to_keep),round(freq*filter_dt)) ;
-    gf = smooth(gf(rows_to_keep),round(freq*filter_dt)) ;
+    gf = gf(rows_to_keep) ;
     sc = sc(rows_to_keep) ;
     % shifting position vector for 0 value at start
     x = x-x(1) ;
     % curvature
     switch log_mode
         case 'speed & yaw'
-            r = w./v ;
+            r = lambda*w./v ;
         case 'speed & latacc'
-            r = ay./v.^2 ;
+            r = lambda*ay./v.^2 ;
     end
     r = smooth(r,round(freq*filter_dt)) ;
     % mirroring if needed
@@ -285,6 +292,10 @@ else % shape data
     if strcmp(info.mirror,'On')
         type = -type ;
     end
+    % removing segments with zero length
+    R(l==0) = [] ;
+    type(l==0) = [] ;
+    l(l==0) = [] ;
     % injecting points at long corners
     angle_seg = rad2deg(l./R) ;
     j = 1 ; % index
@@ -323,6 +334,22 @@ else % shape data
     R = RR ;
     l = ll ;
     type = tt ;
+    % replacing consecutive straights
+    for i=1:length(l)-1
+        j = 1 ;
+        while true
+            if type(i+j)==0 && type(i)==0 && l(i)~=-1
+                l(i) = l(i)+l(i+j) ;
+                l(i+j) = -1 ;
+            else
+                break
+            end
+            j = j+1 ;
+        end
+    end
+    R(l==-1) = [] ;
+    type(l==-1) = [] ;
+    l(l==-1) = [] ;
     % final segment point calculation
     X = cumsum(l) ; % end position of each segment
     XC = cumsum(l)-l/2 ; % center position of each segment
@@ -400,7 +427,7 @@ disp("Fine meshing completed with mesh size: "+num2str(mesh_size)+" [m]")
 X = zeros(n,1) ;
 Y = zeros(n,1) ;
 % segment angles
-angle_seg = lambda*rad2deg(dx.*r) ;
+angle_seg = rad2deg(dx.*r) ;
 % heading angles
 angle_head = cumsum(angle_seg) ;
 if strcmp(info.config,'Closed') % tangency correction for closed track
@@ -517,6 +544,7 @@ Xpos = floor((SS(3)-W)/2) ;
 Ypos = floor((SS(4)-H)/2) ;
 f = figure('Name',filename,'Position',[Xpos,Ypos,W,H]) ;
 figtitle = ["OpenTRACK","Track Name: "+info.name,"Configuration: "+info.config,"Mirror: "+info.mirror,"Date & Time: "+datestr(now,'yyyy/mm/dd')+" "+datestr(now,'HH:MM:SS')] ;
+figtitle = strrep(figtitle,"_"," ") ;
 sgtitle(figtitle)
 
 % rows and columns
