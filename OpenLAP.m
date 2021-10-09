@@ -48,7 +48,7 @@ tic
 
 %% Filenames
 
-trackfile = 'OpenTRACK Tracks/OpenTRACK_Spa-Francorchamps_Closed_Forward.mat' ;
+trackfile = 'OpenTRACK Tracks/OpenTRACK_Paul Ricard_Closed_Forward.mat' ;
 vehiclefile = 'OpenVEHICLE Vehicles/OpenVEHICLE_Formula 1_Open Wheel.mat' ;
 
 %% Loading circuit
