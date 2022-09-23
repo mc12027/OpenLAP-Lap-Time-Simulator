@@ -19,7 +19,7 @@ Michael Chalkiopoulos
 Cranfield University MSc Advanced Motorsport Engineer
 National Technical University of Athens MEng Mechanical Engineer
 
-LinkedIn: https://www.linkedin.com/in/michael-chalkiopoulos/
+LinkedIn: https://www.linkedin.com/in/michael-halkiopoulos/
 email: halkiopoulos_michalis@hotmail.com
 MATLAB file exchange: https://uk.mathworks.com/matlabcentral/fileexchange/
 GitHub: https://github.com/mc12027
