@@ -20,11 +20,11 @@
 %
 % Open Source MATLAB project created by:
 %
-% Michael Chalkiopoulos
+% Michael Halkiopoulos
 % Cranfield University Advanced Motorsport MSc Engineer
 % National Technical University of Athens MEng Mechanical Engineer
 %
-% LinkedIn: https://www.linkedin.com/in/michael-chalkiopoulos/
+% LinkedIn: https://www.linkedin.com/in/michael-halkiopoulos/
 % email: halkiopoulos_michalis@hotmail.com
 % MATLAB file exchange: https://uk.mathworks.com/matlabcentral/fileexchange/
 % GitHub: https://github.com/mc12027
