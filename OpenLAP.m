@@ -511,7 +511,7 @@ function [sim] = simulate(veh,tr,simname,logid)
     percent_in_accel = sum(TPS>0)/tr.n*100 ;
     percent_in_decel = sum(BPS>0)/tr.n*100 ;
     percent_in_coast = sum(and(BPS==0,TPS==0))/tr.n*100 ;
-    percent_in_full_tps = sum(tps==1)/tr.n*100 ;
+    percent_in_full_tps = sum(TPS==1)/tr.n*100 ;
     percent_in_gear = zeros(veh.nog,1) ;
     for i=1:veh.nog
         percent_in_gear(i) = sum(gear==i)/tr.n*100 ;
